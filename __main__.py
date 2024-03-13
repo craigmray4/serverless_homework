@@ -2,6 +2,7 @@ import json
 import pulumi
 import pulumi_aws as aws
 from pulumi_aws import s3
+from iam_module import IAMModule
 
 
 TABLE_NAME = "craigray-pulumi-hw-table"
@@ -14,34 +15,9 @@ ENVIRONMENT = "homework"
 # Lambda Permissions
 #############################################
 
-iam_policy_document = aws.iam.get_policy_document(statements=[
-    {
-        'effect': 'Allow',
-        'actions': ['dynamodb:PutItem'],
-        'resources': ['*'],
-    }
-])
+# Used a Component Resource here, from iam_module.py
 
-policy_one = aws.iam.Policy("policy_one",
-    name = "CraigRayHWLambdaPolicy",
-    policy = iam_policy_document.json)
-
-role = aws.iam.Role("role", 
-    assume_role_policy = json.dumps({
-        "Version": "2012-10-17",
-        "Statement": [{
-            "Action": "sts:AssumeRole",
-            "Effect": "Allow",
-            "Principal": {
-                "Service": "lambda.amazonaws.com",
-            },
-        }],
-    }),
-    managed_policy_arns = [
-        aws.iam.ManagedPolicy.AWS_LAMBDA_BASIC_EXECUTION_ROLE,
-        policy_one.arn,
-        ]
-    )
+iam_mod = IAMModule("IAMModule", opts=pulumi.ResourceOptions(parent=None))
 
 
 #############################################
@@ -52,7 +28,7 @@ lambda_fn = aws.lambda_.Function(FUNCTION_NAME,
     name = FUNCTION_NAME,
     runtime = "python3.9",
     handler = "handler.handler",
-    role = role.arn,
+    role = iam_mod.role.arn,
     code = pulumi.FileArchive("./function"),
     tags = {
            "Name": FUNCTION_NAME,
