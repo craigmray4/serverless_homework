@@ -1,0 +1,10 @@
+name: serverless_homework
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: Deploy a serverless application on AWS for homework
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: serverless-aws-python
