@@ -3,8 +3,11 @@ import pulumi
 import pulumi_aws as aws
 from pulumi_aws import s3
 
-region = "us-west-2"
-table_name = "craigray-homework"
+
+TABLE_NAME = "craigray-pulumi-hw-table"
+FUNCTION_NAME = "craigray-pulumi-hw-function"
+BUCKET_NAME = "craigray-pulumi-hw-bucket"
+ENVIRONMENT = "homework"
 
 
 #############################################
@@ -20,11 +23,11 @@ iam_policy_document = aws.iam.get_policy_document(statements=[
 ])
 
 policy_one = aws.iam.Policy("policy_one",
-    name="CraigRayHWLambdaPolicy",
-    policy=iam_policy_document.json)
+    name = "CraigRayHWLambdaPolicy",
+    policy = iam_policy_document.json)
 
 role = aws.iam.Role("role", 
-    assume_role_policy=json.dumps({
+    assume_role_policy = json.dumps({
         "Version": "2012-10-17",
         "Statement": [{
             "Action": "sts:AssumeRole",
@@ -34,7 +37,7 @@ role = aws.iam.Role("role",
             },
         }],
     }),
-    managed_policy_arns=[
+    managed_policy_arns = [
         aws.iam.ManagedPolicy.AWS_LAMBDA_BASIC_EXECUTION_ROLE,
         policy_one.arn,
         ]
@@ -45,21 +48,33 @@ role = aws.iam.Role("role",
 # Lambda Function
 #############################################
 
-lambda_fn = aws.lambda_.Function("fn",
-    runtime="python3.9",
-    handler="handler.handler",
-    role=role.arn,
-    code=pulumi.FileArchive("./function"))
+lambda_fn = aws.lambda_.Function(FUNCTION_NAME,
+    name = FUNCTION_NAME,
+    runtime = "python3.9",
+    handler = "handler.handler",
+    role = role.arn,
+    code = pulumi.FileArchive("./function"),
+    tags = {
+           "Name": FUNCTION_NAME,
+           "Environment": ENVIRONMENT
+    }
+)
 
 
 #############################################
 # S3 Bucket
 #############################################
 
-bucket = s3.BucketV2("bucket", bucket="craigray-pulumi-hw-bucket")
+bucket = s3.BucketV2("bucket", bucket=BUCKET_NAME,
+        tags = {
+            "Name": BUCKET_NAME,
+            "Environment": ENVIRONMENT
+        }
+)
 
 bucket_notification = aws.s3.BucketNotification(
     "bucket-notification",
+    opts = pulumi.ResourceOptions(depends_on = [bucket, lambda_fn]),
     bucket = bucket.id,
     lambda_functions = [
         aws.s3.BucketNotificationLambdaFunctionArgs(
@@ -75,11 +90,11 @@ bucket_notification = aws.s3.BucketNotification(
 #############################################
 
 allow_bucket = aws.lambda_.Permission("allow_bucket",
-    statement_id="AllowExecutionFromS3Bucket",
-    action="lambda:InvokeFunction",
-    function=lambda_fn.arn,
-    principal="s3.amazonaws.com",
-    source_arn=bucket.arn)
+    statement_id = "AllowExecutionFromS3Bucket",
+    action = "lambda:InvokeFunction",
+    function = lambda_fn.arn,
+    principal = "s3.amazonaws.com",
+    source_arn = bucket.arn)
 
 
 #############################################
@@ -87,7 +102,8 @@ allow_bucket = aws.lambda_.Permission("allow_bucket",
 #############################################
 
 dynamo_table = aws.dynamodb.Table(
-    table_name,
+    TABLE_NAME,
+    name = TABLE_NAME,
     attributes = [
         {
             "name": "id",
@@ -98,10 +114,11 @@ dynamo_table = aws.dynamodb.Table(
     billing_mode = "PAY_PER_REQUEST",
     stream_enabled = False,
     tags = {
-        "Name": table_name,
-        "Environment": "homework"
+        "Name": TABLE_NAME,
+        "Environment": ENVIRONMENT
     },
-    opts=pulumi.Alias(name = table_name)
 )
 
 pulumi.export("table_name", dynamo_table.name)
+pulumi.export("bucket_name", bucket.bucket)
+pulumi.export("function_name", lambda_fn.name)

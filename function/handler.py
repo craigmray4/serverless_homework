@@ -4,14 +4,15 @@ import os, boto3, json
 s3 = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
 
-table_name = "craigray-homework"
+TABLE_NAME = "craigray-pulumi-hw-table"
 
 def handler(event, context):
-    table = dynamodb.Table(table_name)
+    table = dynamodb.Table(TABLE_NAME)
 
+    # loop through all files captured by the event
     for item in event['Records']:
+
         timestamp = str(datetime.now())
-        bucket = event['Records'][0]['s3']['bucket']['name']
         key = event['Records'][0]['s3']['object']['key']
 
         print("---------")
@@ -22,6 +23,6 @@ def handler(event, context):
             'timestamp': timestamp
             })
         
-        print(f"Uploaded {key} to {table_name}")
+        print(f"Uploaded {key} to {TABLE_NAME}")
         print("---------")
 
